@@ -47,8 +47,8 @@ public class InfoPanel extends JPanel {
         saveButton.addActionListener(e -> {
             if (onSave != null) {
                 onSave.run();
-        
-            }});
+            }
+        });
 
         panel.add(fields, BorderLayout.CENTER);
         panel.add(saveButton, BorderLayout.SOUTH);
@@ -65,6 +65,11 @@ public class InfoPanel extends JPanel {
 
     public String getSaveNotes() {
         return notesArea.getText().trim();
+    }
+
+    public void setSaveFields(String title, String notes) {
+        titleField.setText(title);
+        notesArea.setText(notes);
     }
 
     public void clearSaveFields() {

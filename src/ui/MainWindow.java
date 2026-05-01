@@ -4,13 +4,11 @@ import app.GameController;
 import app.HumanPlayer;
 import core.GameState;
 import core.MoveEncoder;
-import core.MoveGenerator;
-
-import openings.OpeningBook;
-import openings.OpeningTrainer;
-
-import javax.swing.*;
 import java.awt.*;
+import javax.swing.*;
+import openings.OpeningBook;
+import openings.OpeningLine;
+import openings.OpeningTrainer;
 
 public class MainWindow extends JFrame implements GameController.GameListener {
 
@@ -57,8 +55,23 @@ public class MainWindow extends JFrame implements GameController.GameListener {
         boardPanel.clearCheck();
         infoPanel.reset();
 
-        openingBook = new OpeningBook("../data/openings.json");
+        openingBook = new OpeningBook(getDataPath("openings.json"));
         openingTrainer = new OpeningTrainer(openingBook);
+        openingTrainer.setMatchListener(new OpeningTrainer.MatchListener() {
+            @Override
+            public void onLineMatched(OpeningLine line) {
+                SwingUtilities.invokeLater(() -> {
+                    infoPanel.setSaveFields(line.name, line.notes);
+                });
+            }
+
+            @Override
+            public void onLineUnmatched() {
+                SwingUtilities.invokeLater(() -> {
+                    infoPanel.clearSaveFields();
+                });
+            }
+        });
         controller.setOpeningTrainer(openingTrainer);
 
         controller.startGame();
@@ -74,21 +87,31 @@ public class MainWindow extends JFrame implements GameController.GameListener {
         }
         String notes = infoPanel.getSaveNotes();
         openingTrainer.saveCurrentLine(title, notes);
-        infoPanel.clearSaveFields();
         JOptionPane.showMessageDialog(this,
                 "Line saved to repertoire.", "Saved",
                 JOptionPane.INFORMATION_MESSAGE);
     }
 
+    private String getDataPath(String filename) {
+        // Resolve relative to the project root (one level up from src or out)
+        String workingDir = System.getProperty("user.dir");
+        java.io.File dataDir = new java.io.File(workingDir, "data");
+        dataDir.mkdirs();
+        return new java.io.File(dataDir, filename).getAbsolutePath();
+    }
+
     // GameListener callbacks (called from background thread, must dispatch to EDT)
     @Override
-    public void onMoveMade(GameState gs, int move) {
+    public void onMoveMade(GameState gs, int move, String san) {
         SwingUtilities.invokeLater(() -> {
             boardPanel.clearCheck();
-            boardPanel.updateState(gs);
             if (move != -1) {
-                infoPanel.addMove(MoveEncoder.toAlgebraic(move));
+                boardPanel.setLastMove(MoveEncoder.getFrom(move), MoveEncoder.getTo(move));
+                infoPanel.addMove(san);
+            } else {
+                boardPanel.clearLastMove();
             }
+            boardPanel.updateState(gs);
             infoPanel.setStatus(gs.isWhiteToMove() ? "White to move" : "Black to move");
         });
     }

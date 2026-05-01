@@ -2,24 +2,18 @@ package app;
 
 import core.GameState;
 import core.MoveGenerator;
-
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
 import openings.OpeningTrainer;
 
 public class GameController {
 
     // UI registers a listener to receive game events
     public interface GameListener {
-
-        void onMoveMade(GameState gs, int move);
-
+        void onMoveMade(GameState gs, int move, String san);
         void onCheckmate(int winningSide);
-
         void onStalemate();
-
         void onCheck(int sideInCheck);
     }
 
@@ -92,15 +86,17 @@ public class GameController {
 
             // Save state for undo before applying
             history.push(currentState);
+            
+            // Before applyMove:
+            GameState beforeMove = currentState.copy();
 
             MoveGenerator.applyMove(currentState, move);
 
-            if (openingTrainer != null)
-                openingTrainer.recordMove(move);
+            if (openingTrainer != null) openingTrainer.recordMove(move);
 
-            if (listener != null) {
-                listener.onMoveMade(currentState, move);
-            }
+            String san = PgnUtil.toSan(move, beforeMove);
+
+            if (listener != null) listener.onMoveMade(currentState, move, san);
 
             // Check if the move put the opponent in check
             List<Integer> opponentMoves = MoveGenerator.generateLegalMoves(currentState);
@@ -122,7 +118,7 @@ public class GameController {
                 openingTrainer.undoLastMove();
             }
             if (listener != null) {
-                listener.onMoveMade(currentState, -1);
+                listener.onMoveMade(currentState, -1, null);
             }
         }
     }

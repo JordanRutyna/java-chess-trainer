@@ -16,13 +16,13 @@ public class BoardPanel extends JPanel {
 
     private static final int TILE_SIZE = 80;
 
-    private static final Color LIGHT          = new Color(240, 217, 181);
-    private static final Color DARK           = new Color(181, 136, 99);
-    private static final Color HIGHLIGHT      = new Color(106, 135, 75, 180);
-    private static final Color LEGAL_DOT      = new Color(0, 0, 0, 60);
-    private static final Color LEGAL_CAP      = new Color(106, 135, 75, 120);
-    private static final Color CHECK_RED      = new Color(220, 50, 50, 160);
-    private static final Color LAST_MOVE      = new Color(205, 210, 106, 160);
+    private static final Color LIGHT = new Color(240, 217, 181);
+    private static final Color DARK = new Color(181, 136, 99);
+    private static final Color HIGHLIGHT = new Color(106, 135, 75, 180);
+    private static final Color LEGAL_DOT = new Color(0, 0, 0, 60);
+    private static final Color LEGAL_CAP = new Color(106, 135, 75, 120);
+    private static final Color CHECK_RED = new Color(220, 50, 50, 160);
+    private static final Color LAST_MOVE = new Color(205, 210, 106, 160);
 
     private GameState gameState;
     private final PieceRenderer renderer;
@@ -30,17 +30,17 @@ public class BoardPanel extends JPanel {
     private HumanPlayer blackPlayer;
 
     // Selection and drag state
-    private int selectedSquare   = -1;
-    private int dragSquare       = -1;   // square being dragged from
-    private int dragX            = -1;
-    private int dragY            = -1;
-    private boolean isDragging   = false;
+    private int selectedSquare = -1;
+    private int dragSquare = -1;   // square being dragged from
+    private int dragX = -1;
+    private int dragY = -1;
+    private boolean isDragging = false;
     private List<Integer> legalMovesForSelected = new ArrayList<>();
 
     // Highlight state
     private int checkedKingSquare = -1;
-    private int lastMoveFrom      = -1;
-    private int lastMoveTo        = -1;
+    private int lastMoveFrom = -1;
+    private int lastMoveTo = -1;
 
     public BoardPanel(PieceRenderer renderer) {
         this.renderer = renderer;
@@ -93,18 +93,20 @@ public class BoardPanel extends JPanel {
 
     public void setLastMove(int from, int to) {
         this.lastMoveFrom = from;
-        this.lastMoveTo   = to;
+        this.lastMoveTo = to;
     }
 
     public void clearLastMove() {
         this.lastMoveFrom = -1;
-        this.lastMoveTo   = -1;
+        this.lastMoveTo = -1;
     }
 
     private int pixelToSquare(int x, int y) {
         int file = x / TILE_SIZE;
         int rank = 7 - (y / TILE_SIZE);
-        if (file < 0 || file > 7 || rank < 0 || rank > 7) return -1;
+        if (file < 0 || file > 7 || rank < 0 || rank > 7) {
+            return -1;
+        }
         return rank * 8 + file;
     }
 
@@ -115,14 +117,18 @@ public class BoardPanel extends JPanel {
     }
 
     private void handlePress(int x, int y) {
-        if (gameState == null) return;
+        if (gameState == null) {
+            return;
+        }
         int square = pixelToSquare(x, y);
-        if (square == -1) return;
+        if (square == -1) {
+            return;
+        }
 
-        long squareBit  = 1L << square;
-        boolean isOwn   = gameState.isWhiteToMove()
-            ? (gameState.board.whitePieces & squareBit) != 0
-            : (gameState.board.blackPieces & squareBit) != 0;
+        long squareBit = 1L << square;
+        boolean isOwn = gameState.isWhiteToMove()
+                ? (gameState.board.whitePieces & squareBit) != 0
+                : (gameState.board.blackPieces & squareBit) != 0;
 
         // If clicking a legal move destination while something is selected, move there
         if (selectedSquare != -1 && !isOwn) {
@@ -140,10 +146,10 @@ public class BoardPanel extends JPanel {
 
         if (isOwn) {
             selectedSquare = square;
-            dragSquare     = square;
-            dragX          = x;
-            dragY          = y;
-            isDragging     = false; // not dragging yet, just pressed
+            dragSquare = square;
+            dragX = x;
+            dragY = y;
+            isDragging = false; // not dragging yet, just pressed
 
             List<Integer> allLegal = MoveGenerator.generateLegalMoves(gameState);
             legalMovesForSelected = new ArrayList<>();
@@ -162,7 +168,9 @@ public class BoardPanel extends JPanel {
     }
 
     private void handleDrag(int x, int y) {
-        if (dragSquare == -1) return;
+        if (dragSquare == -1) {
+            return;
+        }
         isDragging = true;
         dragX = x;
         dragY = y;
@@ -170,7 +178,9 @@ public class BoardPanel extends JPanel {
     }
 
     private void handleRelease(int x, int y) {
-        if (gameState == null || dragSquare == -1) return;
+        if (gameState == null || dragSquare == -1) {
+            return;
+        }
 
         if (isDragging) {
             int targetSquare = pixelToSquare(x, y);
@@ -212,25 +222,29 @@ public class BoardPanel extends JPanel {
     private int handlePromotion(int move) {
         String[] options = {"Queen", "Rook", "Bishop", "Knight"};
         int choice = JOptionPane.showOptionDialog(
-            this, "Promote to:", "Pawn Promotion",
-            JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,
-            null, options, options[0]);
-        if (choice < 0) choice = 0;
+                this, "Promote to:", "Pawn Promotion",
+                JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,
+                null, options, options[0]);
+        if (choice < 0) {
+            choice = 0;
+        }
         int[] promoPieces = {
             MoveEncoder.PROMO_QUEEN, MoveEncoder.PROMO_ROOK,
             MoveEncoder.PROMO_BISHOP, MoveEncoder.PROMO_KNIGHT
         };
         int flag = MoveEncoder.getFlag(move) == MoveEncoder.PROMO_CAPTURE
-                 ? MoveEncoder.PROMO_CAPTURE : MoveEncoder.PROMOTION;
+                ? MoveEncoder.PROMO_CAPTURE : MoveEncoder.PROMOTION;
         return MoveEncoder.encodePromotion(
-            MoveEncoder.getFrom(move), MoveEncoder.getTo(move),
-            flag, promoPieces[choice]);
+                MoveEncoder.getFrom(move), MoveEncoder.getTo(move),
+                flag, promoPieces[choice]);
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        if (gameState == null) return;
+        if (gameState == null) {
+            return;
+        }
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
@@ -249,7 +263,7 @@ public class BoardPanel extends JPanel {
                 boolean isLight = (rank + file) % 2 == 0;
                 g.setColor(isLight ? LIGHT : DARK);
                 g.fillRect(file * TILE_SIZE, (7 - rank) * TILE_SIZE,
-                           TILE_SIZE, TILE_SIZE);
+                        TILE_SIZE, TILE_SIZE);
             }
         }
     }
@@ -260,13 +274,13 @@ public class BoardPanel extends JPanel {
             int file = BitBoard.fileOf(lastMoveFrom);
             int rank = BitBoard.rankOf(lastMoveFrom);
             g.fillRect(file * TILE_SIZE, (7 - rank) * TILE_SIZE,
-                       TILE_SIZE, TILE_SIZE);
+                    TILE_SIZE, TILE_SIZE);
         }
         if (lastMoveTo != -1) {
             int file = BitBoard.fileOf(lastMoveTo);
             int rank = BitBoard.rankOf(lastMoveTo);
             g.fillRect(file * TILE_SIZE, (7 - rank) * TILE_SIZE,
-                       TILE_SIZE, TILE_SIZE);
+                    TILE_SIZE, TILE_SIZE);
         }
     }
 
@@ -276,7 +290,7 @@ public class BoardPanel extends JPanel {
             int rank = BitBoard.rankOf(selectedSquare);
             g.setColor(HIGHLIGHT);
             g.fillRect(file * TILE_SIZE, (7 - rank) * TILE_SIZE,
-                       TILE_SIZE, TILE_SIZE);
+                    TILE_SIZE, TILE_SIZE);
         }
     }
 
@@ -286,17 +300,17 @@ public class BoardPanel extends JPanel {
             int rank = BitBoard.rankOf(checkedKingSquare);
             g.setColor(CHECK_RED);
             g.fillRect(file * TILE_SIZE, (7 - rank) * TILE_SIZE,
-                       TILE_SIZE, TILE_SIZE);
+                    TILE_SIZE, TILE_SIZE);
         }
     }
 
     private void drawLegalMoveIndicators(Graphics2D g) {
         for (int move : legalMovesForSelected) {
-            int to   = MoveEncoder.getTo(move);
+            int to = MoveEncoder.getTo(move);
             int file = BitBoard.fileOf(to);
             int rank = BitBoard.rankOf(to);
-            int x    = file * TILE_SIZE;
-            int y    = (7 - rank) * TILE_SIZE;
+            int x = file * TILE_SIZE;
+            int y = (7 - rank) * TILE_SIZE;
             boolean isCapture = (gameState.board.allPieces & (1L << to)) != 0;
             if (isCapture) {
                 g.setColor(LEGAL_CAP);
@@ -306,57 +320,61 @@ public class BoardPanel extends JPanel {
                 g.setColor(LEGAL_DOT);
                 int dotSize = TILE_SIZE / 3;
                 g.fillOval(x + (TILE_SIZE - dotSize) / 2,
-                           y + (TILE_SIZE - dotSize) / 2,
-                           dotSize, dotSize);
+                        y + (TILE_SIZE - dotSize) / 2,
+                        dotSize, dotSize);
             }
         }
     }
 
     private void drawPieces(Graphics2D g) {
         BitBoard b = gameState.board;
-        drawPieceType(g, b.whitePawns,   "w", "p");
+        drawPieceType(g, b.whitePawns, "w", "p");
         drawPieceType(g, b.whiteKnights, "w", "n");
         drawPieceType(g, b.whiteBishops, "w", "b");
-        drawPieceType(g, b.whiteRooks,   "w", "r");
-        drawPieceType(g, b.whiteQueens,  "w", "q");
-        drawPieceType(g, b.whiteKing,    "w", "k");
-        drawPieceType(g, b.blackPawns,   "b", "p");
+        drawPieceType(g, b.whiteRooks, "w", "r");
+        drawPieceType(g, b.whiteQueens, "w", "q");
+        drawPieceType(g, b.whiteKing, "w", "k");
+        drawPieceType(g, b.blackPawns, "b", "p");
         drawPieceType(g, b.blackKnights, "b", "n");
         drawPieceType(g, b.blackBishops, "b", "b");
-        drawPieceType(g, b.blackRooks,   "b", "r");
-        drawPieceType(g, b.blackQueens,  "b", "q");
-        drawPieceType(g, b.blackKing,    "b", "k");
+        drawPieceType(g, b.blackRooks, "b", "r");
+        drawPieceType(g, b.blackQueens, "b", "q");
+        drawPieceType(g, b.blackKing, "b", "k");
     }
 
     private void drawPieceType(Graphics2D g, long board, String color, String piece) {
         while (board != 0) {
-            int sq    = Long.numberOfTrailingZeros(board);
-            board    &= board - 1;
+            int sq = Long.numberOfTrailingZeros(board);
+            board &= board - 1;
             // Skip the piece being dragged, it is drawn separately
-            if (isDragging && sq == dragSquare) continue;
-            int file  = BitBoard.fileOf(sq);
-            int rank  = BitBoard.rankOf(sq);
-            var img   = renderer.getImage(color, piece);
+            if (isDragging && sq == dragSquare) {
+                continue;
+            }
+            int file = BitBoard.fileOf(sq);
+            int rank = BitBoard.rankOf(sq);
+            var img = renderer.getImage(color, piece);
             if (img != null) {
                 g.drawImage(img,
-                    file * TILE_SIZE, (7 - rank) * TILE_SIZE,
-                    TILE_SIZE, TILE_SIZE, null);
+                        file * TILE_SIZE, (7 - rank) * TILE_SIZE,
+                        TILE_SIZE, TILE_SIZE, null);
             }
         }
     }
 
     private void drawDraggedPiece(Graphics2D g) {
-        if (!isDragging || dragSquare == -1 || gameState == null) return;
+        if (!isDragging || dragSquare == -1 || gameState == null) {
+            return;
+        }
 
         String[] colors = {"w", "b"};
-        String[] types  = {"p", "n", "b", "r", "q", "k"};
+        String[] types = {"p", "n", "b", "r", "q", "k"};
         long[][] boards = {
             {gameState.board.whitePawns, gameState.board.whiteKnights,
-             gameState.board.whiteBishops, gameState.board.whiteRooks,
-             gameState.board.whiteQueens, gameState.board.whiteKing},
+                gameState.board.whiteBishops, gameState.board.whiteRooks,
+                gameState.board.whiteQueens, gameState.board.whiteKing},
             {gameState.board.blackPawns, gameState.board.blackKnights,
-             gameState.board.blackBishops, gameState.board.blackRooks,
-             gameState.board.blackQueens, gameState.board.blackKing}
+                gameState.board.blackBishops, gameState.board.blackRooks,
+                gameState.board.blackQueens, gameState.board.blackKing}
         };
 
         long dragBit = 1L << dragSquare;
@@ -367,9 +385,9 @@ public class BoardPanel extends JPanel {
                     if (img != null) {
                         // Center the piece on the cursor
                         g.drawImage(img,
-                            dragX - TILE_SIZE / 2,
-                            dragY - TILE_SIZE / 2,
-                            TILE_SIZE, TILE_SIZE, null);
+                                dragX - TILE_SIZE / 2,
+                                dragY - TILE_SIZE / 2,
+                                TILE_SIZE, TILE_SIZE, null);
                     }
                     return;
                 }
