@@ -92,9 +92,8 @@ public class GameController {
 
             MoveGenerator.applyMove(currentState, move);
 
-            if (openingTrainer != null) openingTrainer.recordMove(move);
-
             String san = PgnUtil.toSan(move, beforeMove);
+            if (openingTrainer != null) openingTrainer.recordMove(move, san);
 
             if (listener != null) listener.onMoveMade(currentState, move, san);
 

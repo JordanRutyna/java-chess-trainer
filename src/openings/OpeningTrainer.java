@@ -1,79 +1,88 @@
 package openings;
 
-import core.MoveEncoder;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 public class OpeningTrainer {
 
     public interface MatchListener {
-        void onLineMatched(OpeningLine line);
-        void onLineUnmatched();
+        void onLineMatched(OpeningNode node);
+        void onLineUnmatched(String parentTitle);
     }
 
-    private final OpeningBook book;
-    private final List<String> currentMoves = new ArrayList<>();
+    public interface ResponseListener {
+        void onResponseAvailable(String moveAlgebraic);
+    }
+
+    private final OpeningLibrary library;
+    private final List<String> currentSans = new ArrayList<>();
+    private String activeBook    = "All";
+    private boolean userIsWhite  = true;
     private MatchListener matchListener;
+    private ResponseListener responseListener;
+    private final Random random  = new Random();
 
-    public OpeningTrainer(OpeningBook book) {
-        this.book = book;
+    public OpeningTrainer(OpeningLibrary library) {
+        this.library = library;
     }
 
-    public void setMatchListener(MatchListener listener) {
-        this.matchListener = listener;
-    }
+    public void setMatchListener(MatchListener l)       { this.matchListener    = l; }
+    public void setResponseListener(ResponseListener l) { this.responseListener = l; }
+    public void setUserColor(boolean userIsWhite)       { this.userIsWhite       = userIsWhite; }
+    public void setActiveBook(String bookName)          { this.activeBook        = bookName; }
 
-    public void recordMove(int move) {
-        currentMoves.add(MoveEncoder.toAlgebraic(move));
-        checkForMatch();
+    public void recordMove(int move, String san) {
+        currentSans.add(san);
+        notifyMatch();
+        checkForResponse();
     }
 
     public void undoLastMove() {
-        if (!currentMoves.isEmpty()) {
-            currentMoves.remove(currentMoves.size() - 1);
-            checkForMatch();
+        if (!currentSans.isEmpty()) {
+            currentSans.remove(currentSans.size() - 1);
+            notifyMatch();
         }
     }
 
     public void reset() {
-        currentMoves.clear();
-        if (matchListener != null) {
-            matchListener.onLineUnmatched();
+        currentSans.clear();
+        if (matchListener != null) matchListener.onLineUnmatched(null);
+    }
+
+    public void saveCurrentLine(String name, String notes, String bookName) {
+        OpeningBook book = library.getBook(bookName);
+        if (book == null) book = library.createBook(bookName);
+        book.saveLine(new ArrayList<>(currentSans), name, notes);
+        notifyMatch();
+    }
+
+    public List<String> getCurrentSans() {
+        return Collections.unmodifiableList(currentSans);
+    }
+
+    public OpeningLibrary getLibrary() { return library; }
+
+    private void notifyMatch() {
+        if (matchListener == null) return;
+        OpeningNode node = library.findNode(currentSans, activeBook);
+        if (node != null) {
+            matchListener.onLineMatched(node);
+        } else {
+            matchListener.onLineUnmatched(
+                library.findParentTitle(currentSans, activeBook));
         }
     }
 
-    public void saveCurrentLine(String name, String notes) {
-        List<OpeningLine> lines = new ArrayList<>(book.getLines());
-        for (int i = 0; i < lines.size(); i++) {
-            if (lines.get(i).moves.equals(currentMoves)) {
-                book.updateLine(i, new OpeningLine(name, notes, new ArrayList<>(currentMoves)));
-                return;
-            }
-        }
-        // No existing line with these moves, add a new one
-        book.addLine(new OpeningLine(name, notes, new ArrayList<>(currentMoves)));
-    }
+    private void checkForResponse() {
+        if (responseListener == null) return;
 
-    public List<String> getCurrentMoves() {
-        return Collections.unmodifiableList(currentMoves);
-    }
+        boolean blackToMove = currentSans.size() % 2 != 0;
+        if (userIsWhite  && !blackToMove) return;
+        if (!userIsWhite && blackToMove)  return;
 
-    public OpeningBook getBook() {
-        return book;
-    }
+        List<String> candidates = library.getCandidateMoves(currentSans, activeBook);
+        if (candidates.isEmpty()) return;
 
-    // Check if current move sequence exactly matches any saved line
-    private void checkForMatch() {
-        if (matchListener == null) {
-            return;
-        }
-        for (OpeningLine line : book.getLines()) {
-            if (line.moves.equals(currentMoves)) {
-                matchListener.onLineMatched(line);
-                return;
-            }
-        }
-        matchListener.onLineUnmatched();
+        String chosen = candidates.get(random.nextInt(candidates.size()));
+        responseListener.onResponseAvailable(chosen);
     }
 }

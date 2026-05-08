@@ -4,10 +4,15 @@ import app.GameController;
 import app.HumanPlayer;
 import core.GameState;
 import core.MoveEncoder;
+import core.MoveGenerator;
 import java.awt.*;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import javax.swing.*;
 import openings.OpeningBook;
-import openings.OpeningLine;
+import openings.OpeningLibrary;
+import openings.OpeningNode;
 import openings.OpeningTrainer;
 
 public class MainWindow extends JFrame implements GameController.GameListener {
@@ -16,9 +21,11 @@ public class MainWindow extends JFrame implements GameController.GameListener {
     private final InfoPanel infoPanel;
     private final PieceRenderer renderer;
     private GameController controller;
-    
-    private OpeningTrainer openingTrainer;
+    private HumanPlayer whitePlayer;
+    private HumanPlayer blackPlayer;
     private OpeningBook openingBook;
+    private OpeningTrainer openingTrainer;
+    private OpeningLibrary openingLibrary;
 
     public MainWindow() {
         super("Chess");
@@ -39,57 +46,124 @@ public class MainWindow extends JFrame implements GameController.GameListener {
     }
 
     private void startNewGame() {
-        if (controller != null) {
-            controller.stopGame();
-        }
+        // Preserve book selection across resets
+        String selectedBook = infoPanel.getSelectedBook();
 
-        HumanPlayer white = new HumanPlayer();
-        HumanPlayer black = new HumanPlayer();
+        if (controller != null) controller.stopGame();
 
-        controller = new GameController(white, black);
+        whitePlayer = new HumanPlayer();
+        blackPlayer = new HumanPlayer();
+
+        controller = new GameController(whitePlayer, blackPlayer);
         controller.setListener(this);
-        infoPanel.setOnSave(this::saveCurrentLine);
 
-        boardPanel.setPlayers(white, black);
+        infoPanel.clearSaveFields();
+        infoPanel.setOnSave(this::saveCurrentLine);
+        infoPanel.setOnReset(this::resetBoard);
+
+        boardPanel.setPlayers(whitePlayer, blackPlayer);
         boardPanel.updateState(controller.getCurrentState());
         boardPanel.clearCheck();
+        boardPanel.clearLastMove();
+        // boardPanel.setFlipped(!infoPanel.isPracticingAsWhite());
         infoPanel.reset();
 
-        openingBook = new OpeningBook(getDataPath("openings.json"));
-        openingTrainer = new OpeningTrainer(openingBook);
+        openingLibrary = new OpeningLibrary(getDataDir());
+        openingTrainer = new OpeningTrainer(openingLibrary);
+        infoPanel.setBooks(openingLibrary.getBookNames());
+        // Restore book selection
+        if (selectedBook != null && !selectedBook.isEmpty()) {
+            infoPanel.setSelectedBook(selectedBook);
+            openingTrainer.setActiveBook(selectedBook);
+        }
+        infoPanel.setOnBookChanged(()
+                -> openingTrainer.setActiveBook(infoPanel.getSelectedBook()));
+
+        openingTrainer.setUserColor(infoPanel.isPracticingAsWhite());
         openingTrainer.setMatchListener(new OpeningTrainer.MatchListener() {
             @Override
-            public void onLineMatched(OpeningLine line) {
-                SwingUtilities.invokeLater(() -> {
-                    infoPanel.setSaveFields(line.name, line.notes);
-                });
+            public void onLineMatched(OpeningNode node) {
+                SwingUtilities.invokeLater(()
+                        -> infoPanel.setSaveFields(node.name, node.notes));
             }
 
             @Override
-            public void onLineUnmatched() {
+            public void onLineUnmatched(String parentTitle) {
                 SwingUtilities.invokeLater(() -> {
-                    infoPanel.clearSaveFields();
+                    if (parentTitle != null && !parentTitle.isEmpty()) {
+                        infoPanel.setInheritedTitle(parentTitle);
+                    } else {
+                        infoPanel.clearSaveFields();
+                    }
                 });
             }
         });
+
+        openingTrainer.setResponseListener(moveAlgebraic
+                -> SwingUtilities.invokeLater(() -> playResponseMove(moveAlgebraic)));
+
         controller.setOpeningTrainer(openingTrainer);
 
         controller.startGame();
+
+        if (!infoPanel.isPracticingAsWhite()) {
+            new javax.swing.Timer(400, e -> {
+                ((javax.swing.Timer) e.getSource()).stop();
+                List<String> candidates = openingLibrary.getCandidateMoves(
+                        new ArrayList<>(), infoPanel.getSelectedBook());
+                if (!candidates.isEmpty()) {
+                    String chosen = candidates.get(new java.util.Random().nextInt(candidates.size()));
+                    playResponseMove(chosen);
+                }
+            }).start();
+        }
     }
 
     private void saveCurrentLine() {
-        String title = infoPanel.getSaveTitle();
-        if (title.isEmpty()) {
+        if (!infoPanel.hasTitleOwned()) {
             JOptionPane.showMessageDialog(this,
                     "Please enter a title for this line.",
                     "Title required", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        String notes = infoPanel.getSaveNotes();
-        openingTrainer.saveCurrentLine(title, notes);
+        String bookName = infoPanel.getSaveBook();
+        if (bookName.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "Please select or create a book to save to.\n"
+                    + "Click the + button next to Book to create one.",
+                    "No book selected", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        openingTrainer.saveCurrentLine(
+                infoPanel.getSaveTitle(),
+                infoPanel.getSaveNotes(),
+                bookName);
+        infoPanel.setBooks(openingLibrary.getBookNames());
         JOptionPane.showMessageDialog(this,
-                "Line saved to repertoire.", "Saved",
+                "Line saved to " + bookName + ".", "Saved",
                 JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void resetBoard() {
+        startNewGame();
+    }
+
+    private void playResponseMove(String algebraic) {
+        new javax.swing.Timer(400, e -> {
+            ((javax.swing.Timer) e.getSource()).stop();
+            GameState gs = controller.getCurrentState();
+            List<Integer> legal = MoveGenerator.generateLegalMoves(gs);
+            for (int move : legal) {
+                if (MoveEncoder.toAlgebraic(move).equals(algebraic)) {
+                    if (gs.isWhiteToMove()) {
+                        whitePlayer.submitMove(move);
+                    } else {
+                        blackPlayer.submitMove(move);
+                    }
+                    return;
+                }
+            }
+        }).start();
     }
 
     private String getDataPath(String filename) {
@@ -98,6 +172,13 @@ public class MainWindow extends JFrame implements GameController.GameListener {
         java.io.File dataDir = new java.io.File(workingDir, "data");
         dataDir.mkdirs();
         return new java.io.File(dataDir, filename).getAbsolutePath();
+    }
+
+    private String getDataDir() {
+        String workingDir = System.getProperty("user.dir");
+        File dataDir = new File(workingDir, "data");
+        dataDir.mkdirs();
+        return dataDir.getAbsolutePath();
     }
 
     // GameListener callbacks (called from background thread, must dispatch to EDT)

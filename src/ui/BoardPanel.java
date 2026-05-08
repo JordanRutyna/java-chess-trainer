@@ -42,6 +42,8 @@ public class BoardPanel extends JPanel {
     private int lastMoveFrom = -1;
     private int lastMoveTo = -1;
 
+    private boolean flipped = false;
+
     public BoardPanel(PieceRenderer renderer) {
         this.renderer = renderer;
         setPreferredSize(new Dimension(TILE_SIZE * 8, TILE_SIZE * 8));
@@ -77,6 +79,11 @@ public class BoardPanel extends JPanel {
         this.blackPlayer = black;
     }
 
+    public void setFlipped(boolean flipped) {
+        this.flipped = flipped;
+        repaint();
+    }
+
     public void updateState(GameState gs) {
         this.gameState = gs;
         repaint();
@@ -104,6 +111,10 @@ public class BoardPanel extends JPanel {
     private int pixelToSquare(int x, int y) {
         int file = x / TILE_SIZE;
         int rank = 7 - (y / TILE_SIZE);
+        if (flipped) {
+            file = 7 - file;
+            rank = 7 - rank;
+        }
         if (file < 0 || file > 7 || rank < 0 || rank > 7) {
             return -1;
         }
@@ -113,6 +124,10 @@ public class BoardPanel extends JPanel {
     private Point squareToPixel(int square) {
         int file = BitBoard.fileOf(square);
         int rank = BitBoard.rankOf(square);
+        if (flipped) {
+            file = 7 - file;
+            rank = 7 - rank;
+        }
         return new Point(file * TILE_SIZE, (7 - rank) * TILE_SIZE);
     }
 
@@ -260,9 +275,11 @@ public class BoardPanel extends JPanel {
     private void drawSquares(Graphics2D g) {
         for (int rank = 0; rank < 8; rank++) {
             for (int file = 0; file < 8; file++) {
-                boolean isLight = (rank + file) % 2 == 0;
+                boolean isLight = (rank + file) % 2 != 0;
                 g.setColor(isLight ? LIGHT : DARK);
-                g.fillRect(file * TILE_SIZE, (7 - rank) * TILE_SIZE,
+                int drawFile = flipped ? 7 - file : file;
+                int drawRank = flipped ? rank : 7 - rank;
+                g.fillRect(drawFile * TILE_SIZE, drawRank * TILE_SIZE,
                         TILE_SIZE, TILE_SIZE);
             }
         }
@@ -271,46 +288,32 @@ public class BoardPanel extends JPanel {
     private void drawLastMoveHighlight(Graphics2D g) {
         g.setColor(LAST_MOVE);
         if (lastMoveFrom != -1) {
-            int file = BitBoard.fileOf(lastMoveFrom);
-            int rank = BitBoard.rankOf(lastMoveFrom);
-            g.fillRect(file * TILE_SIZE, (7 - rank) * TILE_SIZE,
-                    TILE_SIZE, TILE_SIZE);
+            g.fillRect(drawX(lastMoveFrom), drawY(lastMoveFrom), TILE_SIZE, TILE_SIZE);
         }
         if (lastMoveTo != -1) {
-            int file = BitBoard.fileOf(lastMoveTo);
-            int rank = BitBoard.rankOf(lastMoveTo);
-            g.fillRect(file * TILE_SIZE, (7 - rank) * TILE_SIZE,
-                    TILE_SIZE, TILE_SIZE);
+            g.fillRect(drawX(lastMoveTo), drawY(lastMoveTo), TILE_SIZE, TILE_SIZE);
         }
     }
 
     private void drawSelectionHighlight(Graphics2D g) {
         if (selectedSquare != -1) {
-            int file = BitBoard.fileOf(selectedSquare);
-            int rank = BitBoard.rankOf(selectedSquare);
             g.setColor(HIGHLIGHT);
-            g.fillRect(file * TILE_SIZE, (7 - rank) * TILE_SIZE,
-                    TILE_SIZE, TILE_SIZE);
+            g.fillRect(drawX(selectedSquare), drawY(selectedSquare), TILE_SIZE, TILE_SIZE);
         }
     }
 
     private void drawCheckHighlight(Graphics2D g) {
         if (checkedKingSquare != -1) {
-            int file = BitBoard.fileOf(checkedKingSquare);
-            int rank = BitBoard.rankOf(checkedKingSquare);
             g.setColor(CHECK_RED);
-            g.fillRect(file * TILE_SIZE, (7 - rank) * TILE_SIZE,
-                    TILE_SIZE, TILE_SIZE);
+            g.fillRect(drawX(checkedKingSquare), drawY(checkedKingSquare), TILE_SIZE, TILE_SIZE);
         }
     }
 
     private void drawLegalMoveIndicators(Graphics2D g) {
         for (int move : legalMovesForSelected) {
             int to = MoveEncoder.getTo(move);
-            int file = BitBoard.fileOf(to);
-            int rank = BitBoard.rankOf(to);
-            int x = file * TILE_SIZE;
-            int y = (7 - rank) * TILE_SIZE;
+            int x = drawX(to);
+            int y = drawY(to);
             boolean isCapture = (gameState.board.allPieces & (1L << to)) != 0;
             if (isCapture) {
                 g.setColor(LEGAL_CAP);
@@ -324,6 +327,16 @@ public class BoardPanel extends JPanel {
                         dotSize, dotSize);
             }
         }
+    }
+
+    private int drawX(int square) {
+        int file = BitBoard.fileOf(square);
+        return (flipped ? 7 - file : file) * TILE_SIZE;
+    }
+
+    private int drawY(int square) {
+        int rank = BitBoard.rankOf(square);
+        return (flipped ? rank : 7 - rank) * TILE_SIZE;
     }
 
     private void drawPieces(Graphics2D g) {
@@ -346,17 +359,12 @@ public class BoardPanel extends JPanel {
         while (board != 0) {
             int sq = Long.numberOfTrailingZeros(board);
             board &= board - 1;
-            // Skip the piece being dragged, it is drawn separately
             if (isDragging && sq == dragSquare) {
                 continue;
             }
-            int file = BitBoard.fileOf(sq);
-            int rank = BitBoard.rankOf(sq);
             var img = renderer.getImage(color, piece);
             if (img != null) {
-                g.drawImage(img,
-                        file * TILE_SIZE, (7 - rank) * TILE_SIZE,
-                        TILE_SIZE, TILE_SIZE, null);
+                g.drawImage(img, drawX(sq), drawY(sq), TILE_SIZE, TILE_SIZE, null);
             }
         }
     }
